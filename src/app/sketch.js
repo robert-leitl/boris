@@ -4,6 +4,11 @@ import { LoadingManager } from 'three';
 import { Raycaster } from 'three';
 import { Vector3 } from 'three';
 import { resizeRendererToDisplaySize } from './util/resize-renderer-to-display-size';
+import CustomShaderMaterial from 'three-custom-shader-material/vanilla';
+
+import furVertexShader from './shader/fur.vert.glsl';
+import furFragmentShader from './shader/fur.frag.glsl';
+import { ArcballControl } from './util/arcball-control';
 
 // the target duration of one frame in milliseconds
 const TARGET_FRAME_DURATION_MS = 16;
@@ -22,6 +27,7 @@ var frames = 0;
 var deltaFrames = 0;
 
 const settings = {
+    shellParams: new THREE.Vector4(20, 0.08) // (shell count, shell thickness, tbd, tbd)
 }
 
 // module variables
@@ -32,13 +38,23 @@ var _isDev,
     scene, 
     renderer, 
     raycaster,
-    viewportSize
+    arcControl,
+    viewportSize;
+
+let furTexture, furNormalTexture, furInstancedMesh;
 
 function init(canvas, onInit = null, isDev = false, pane = null) {
     _isDev = isDev;
     _pane = pane;
 
-    if (pane) {}
+    if (pane) {
+        pane.addBinding(settings.shellParams, 'y', {
+            label: 'Thickness',
+            min: 0.01,
+            max: 0.2,
+            value: settings.shellParams.y
+        });
+    }
 
     const manager = new LoadingManager();
 
@@ -47,9 +63,21 @@ function init(canvas, onInit = null, isDev = false, pane = null) {
         glbScene = (gltf.scene)
     });*/
 
-    //dotNormalMap = new THREE.TextureLoader(manager).load(new URL('../assets/dot.png', import.meta.url));
+    const furVariant = '02';
+    furTexture = new THREE.TextureLoader(manager).load(new URL(`../assets/fur${furVariant}.png`, import.meta.url));
+    furNormalTexture = new THREE.TextureLoader(manager).load(new URL(`../assets/fur${furVariant}-normal.png`, import.meta.url));
 
-    //manager.onLoad = () => {
+    manager.onLoad = () => {
+        furNormalTexture.colorSpace = THREE.NoColorSpace;
+        furNormalTexture.wrapS = THREE.RepeatWrapping;
+        furNormalTexture.wrapT = THREE.RepeatWrapping;
+        furNormalTexture.magFilter = THREE.NearestFilter;
+        furNormalTexture.minFilter = THREE.NearestFilter;
+        furTexture.wrapS = THREE.RepeatWrapping;
+        furTexture.wrapT = THREE.RepeatWrapping;
+        furTexture.magFilter = THREE.LinearFilter;
+        furTexture.minFilter = THREE.LinearMipMapLinearFilter;
+        furTexture.generateMipmaps = true;
 
         setupScene(canvas);
 
@@ -58,21 +86,60 @@ function init(canvas, onInit = null, isDev = false, pane = null) {
         renderer.setAnimationLoop((t) => run(t));
 
         resize();
-    //}
+    }
 }
 
 function setupScene(canvas) {
-    camera = new THREE.PerspectiveCamera( 20, window.innerWidth / window.innerHeight, 6, 96 );
-    camera.position.set(0, 19, 25);
+    camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 3, 7 );
+    camera.position.set(0, 0, 5);
     camera.lookAt(new Vector3());
     
     scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xfffffa);
     renderer = new THREE.WebGLRenderer( { canvas, antialias: true } );
+    renderer.toneMapping = THREE.NoToneMapping;
     viewportSize = new Vector2(renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2);
+    mainLight.position.y = 3;
+    scene.add(mainLight);
+
+    const ambLight = new THREE.AmbientLight(0xbbeeff, .3);
+    scene.add(ambLight);
+
+    arcControl = new ArcballControl(canvas);
 
     raycaster = new Raycaster();
 
+    setupFur();
+
     _isInitialized = true;
+}
+
+function setupFur() {
+    const shellLayerCount = settings.shellParams.x;
+
+    const furMaterial = new CustomShaderMaterial({
+        baseMaterial: THREE.MeshPhongMaterial,
+        silent: true,
+        uniforms: {
+            shellParams: {value: settings.shellParams},
+            furTexture: {value: furTexture}
+        },
+        normalMap: furNormalTexture,
+        normalScale: new Vector2(0.2, 0.2),
+        vertexShader: furVertexShader,
+        fragmentShader: furFragmentShader,
+        transparent: true,
+        wireframe: false
+      });
+    const furInstanceGeometry = new THREE.IcosahedronGeometry(1, 10);
+    furInstancedMesh = new THREE.InstancedMesh(
+        furInstanceGeometry,
+        furMaterial,
+        shellLayerCount
+    );
+    scene.add(furInstancedMesh);
 }
 
 function run(t = 0) {
@@ -96,6 +163,9 @@ function resize() {
 }
 
 function animate() {
+    arcControl.update(deltaTimeMS);
+
+    furInstancedMesh.quaternion.copy(arcControl.orientation);
 }
 
 function render() {
