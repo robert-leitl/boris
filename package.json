@@ -1,0 +1,24 @@
+{
+  "name": "rocco",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite serve",
+    "build": "vite build --emptyOutDir --base=/rocco/dist/",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "terser": "^5.14.2",
+    "vite": "^3.0.0",
+    "vite-plugin-glsl": "^0.3.0"
+  },
+  "dependencies": {
+    "@loaders.gl/core": "^4.0.2",
+    "@loaders.gl/gltf": "^4.0.2",
+    "gl-matrix": "^3.4.3",
+    "rxjs": "^7.8.1",
+    "three": "^0.158.0",
+    "tweakpane": "^4.0.1"
+  }
+}
