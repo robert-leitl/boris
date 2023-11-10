@@ -1,11 +1,11 @@
 {
-  "name": "rocco",
+  "name": "boris",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "start": "vite serve",
-    "build": "vite build --emptyOutDir --base=/rocco/dist/",
+    "build": "vite build --emptyOutDir --base=/boris/dist/",
     "preview": "vite preview"
   },
   "devDependencies": {
