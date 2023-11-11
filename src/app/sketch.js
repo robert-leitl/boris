@@ -9,6 +9,9 @@ import CustomShaderMaterial from 'three-custom-shader-material/vanilla';
 import furVertexShader from './shader/fur.vert.glsl';
 import furFragmentShader from './shader/fur.frag.glsl';
 import { ArcballControl } from './util/arcball-control';
+import { PoissonBox } from './util/poisson-box';
+import { PoissonSphereSurface } from './util/poisson-sphere-surface';
+import { randomInRange } from './util/random-in-range';
 
 // the target duration of one frame in milliseconds
 const TARGET_FRAME_DURATION_MS = 16;
@@ -42,6 +45,8 @@ var _isDev,
     viewportSize;
 
 let furTexture, furNormalTexture, furInstancedMesh;
+
+let eyesInstancedMesh;
 
 function init(canvas, onInit = null, isDev = false, pane = null) {
     _isDev = isDev;
@@ -111,9 +116,64 @@ function setupScene(canvas) {
 
     raycaster = new Raycaster();
 
+    setupEyes();
     setupFur();
 
     _isInitialized = true;
+}
+
+function setupEyes() {
+    const sphereRadius = 1;
+    const particleSize = 0.1;
+    const samples = new PoissonSphereSurface(sphereRadius, 0.25).generateSamples();
+
+    const particles = samples.map(s => {
+        const particle = {
+            position: s,
+            scale: randomInRange(.8, 1.6),
+            size: particleSize
+        };
+        particle.size *= particle.scale;
+        return particle;
+    });
+
+    // relax particles
+    for(let r=0; r<30; ++r) {
+        particles.forEach(p => {
+            const offset = new Vector3();
+    
+            particles.filter(n => n !== p).forEach(n => {
+    
+                const d = new Vector3().subVectors(p.position, n.position);
+                const l = d.lengthSq();
+                const s = p.size + n.size;
+    
+                if (l < s ** 2) {
+                    offset.add(d.divideScalar(l));
+                }
+            });
+    
+            offset.multiplyScalar(0.015);
+            p.position.add(offset).setLength(sphereRadius);
+        })
+    }
+
+
+    eyesInstancedMesh = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(particleSize, 10),
+        new THREE.MeshLambertMaterial({ color: 0x444444 }),
+        particles.length
+    );
+
+    for(let i=0; i<eyesInstancedMesh.count; ++i) {
+        const m = new THREE.Matrix4();
+        const p = particles[i];
+        m.makeTranslation(p.position);
+        m.multiply(new THREE.Matrix4().makeScale(p.scale, p.scale, p.scale));
+        eyesInstancedMesh.setMatrixAt(i, m);
+    }
+
+    scene.add(eyesInstancedMesh);
 }
 
 function setupFur() {
@@ -139,7 +199,7 @@ function setupFur() {
         furMaterial,
         shellLayerCount
     );
-    scene.add(furInstancedMesh);
+    //scene.add(furInstancedMesh);
 }
 
 function run(t = 0) {
@@ -165,7 +225,7 @@ function resize() {
 function animate() {
     arcControl.update(deltaTimeMS);
 
-    furInstancedMesh.quaternion.copy(arcControl.orientation);
+    eyesInstancedMesh.quaternion.copy(arcControl.orientation);
 }
 
 function render() {
