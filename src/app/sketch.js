@@ -5,14 +5,19 @@ import { Raycaster } from 'three';
 import { Vector3 } from 'three';
 import { resizeRendererToDisplaySize } from './util/resize-renderer-to-display-size';
 import CustomShaderMaterial from 'three-custom-shader-material/vanilla';
-
-import furVertexShader from './shader/fur.vert.glsl';
-import furFragmentShader from './shader/fur.frag.glsl';
 import { ArcballControl } from './util/arcball-control';
 import { PoissonBox } from './util/poisson-box';
 import { PoissonSphereSurface } from './util/poisson-sphere-surface';
 import { randomInRange } from './util/random-in-range';
 import { fromEvent } from 'rxjs';
+
+import furVertexShader from './shader/fur.vert.glsl';
+import furFragmentShader from './shader/fur.frag.glsl';
+import particleTextureVertexShader from './shader/particle-texture.vert.glsl';
+import particleTextureFragmentShader from './shader/particle-texture.frag.glsl';
+import heightMapVertexShader from './shader/height-map.vert.glsl';
+import heightMapFragmentShader from './shader/height-map.frag.glsl';
+import { QuadGeometry } from './util/quad-geometry';
 
 // the target duration of one frame in milliseconds
 const TARGET_FRAME_DURATION_MS = 16;
@@ -56,6 +61,13 @@ let eyesInstancedMesh, particles, eyePointerTargetMesh;
 const normPointerPos = new Vector2();
 let surfacePoint = null;
 const surfaceVelocity = new Vector3();
+
+let quadMesh;
+
+let particleTextureMesh, particleTextureMaterial, particleTextureRT, heightMapMaterial, heightMapRT, particleData;
+
+const RAYCASTER_CHANNEL = 5;
+const PARTICLE_CHANNEL = 10;
 
 function init(canvas, onInit = null, isDev = false, pane = null) {
     _isDev = isDev;
@@ -129,6 +141,7 @@ function setupScene(canvas) {
     raycaster = new Raycaster();
 
     setupEyes();
+    setupParticleProcessing();
     setupFur();
 
     _isInitialized = true;
@@ -196,15 +209,56 @@ function setupEyes() {
         new THREE.MeshBasicMaterial({ colorWrite: false })
     );
     eyePointerTargetMesh.visible = false;
-    eyePointerTargetMesh.layers.set(5);
-    raycaster.layers.set(5);
-    camera.layers.enable(5);
+    eyePointerTargetMesh.layers.set(RAYCASTER_CHANNEL);
+    raycaster.layers.set(RAYCASTER_CHANNEL);
+    camera.layers.enable(RAYCASTER_CHANNEL);
     orbGroup.add(eyePointerTargetMesh);
 
     fromEvent(window, 'pointermove').subscribe(e => {
         normPointerPos.x = ( e.clientX / window.innerWidth ) * 2 - 1;
 	    normPointerPos.y = - ( e.clientY / window.innerHeight ) * 2 + 1;
     });
+}
+
+function setupParticleProcessing() {
+    // get a power of two texture size
+    const textureSize = 2**Math.ceil(Math.log2(Math.sqrt(particles.length)));
+    
+    const particleTextureGeometry = new THREE.BufferGeometry();
+    particleData = new THREE.BufferAttribute( new Float32Array(particles.length * 4), 4 );
+    particles.forEach((p, i) => particleData.setXYZ(i, p.position.x, p.position.y, p.position.z));
+    particleData.usage = THREE.DynamicDrawUsage;
+    particleTextureGeometry.setAttribute( 'position', particleData );
+    particleTextureMaterial = new THREE.RawShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        vertexShader: particleTextureVertexShader,
+        fragmentShader: particleTextureFragmentShader,
+        uniforms: {
+            textureSize: { value: textureSize }
+        },
+        depthTest: false,
+        depthWrite: false
+    });
+    particleTextureMesh = new THREE.Points(particleTextureGeometry, particleTextureMaterial);
+    particleTextureMesh.layers.set(PARTICLE_CHANNEL);
+    scene.add(particleTextureMesh);
+    particleTextureRT = new THREE.WebGLRenderTarget(textureSize, textureSize, {type: THREE.HalfFloatType, format: THREE.RGBAFormat, magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter});
+
+    heightMapMaterial = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        vertexShader: heightMapVertexShader,
+        fragmentShader: heightMapFragmentShader,
+        uniforms: {
+            particleTexture: { value: particleTextureRT.texture }
+        }
+    });
+    const heightMapSize = 1024;
+    heightMapRT = new THREE.WebGLRenderTarget(heightMapSize, heightMapSize, { type: THREE.HalfFloatType, format: THREE.RedFormat });
+
+    quadMesh = new THREE.Mesh(
+        new QuadGeometry(),
+        heightMapMaterial
+    );
 }
 
 function setupFur() {
@@ -215,7 +269,8 @@ function setupFur() {
         silent: true,
         uniforms: {
             shellParams: {value: settings.shellParams},
-            furTexture: {value: furTexture}
+            furTexture: {value: furTexture},
+            heightMapTexture: {value: null}
         },
         normalMap: furNormalTexture,
         normalScale: new Vector2(0.2, 0.2),
@@ -307,12 +362,31 @@ function animate() {
         m.makeTranslation(p.position);
         m.multiply(new THREE.Matrix4().makeScale(p.animation.scale, p.animation.scale, p.animation.scale));
         eyesInstancedMesh.setMatrixAt(i, m);
+
+        particleData.setXYZ(i, p.position.x, p.position.y, p.position.z, p.animation.scale);
     }
+    particleData.needsUpdate = true;
     eyesInstancedMesh.instanceMatrix.needsUpdate = true;
 }
 
 function render() {
+    processParticles();
+    furInstancedMesh.material.uniforms.heightMapTexture.value = heightMapRT.texture;
     renderer.render( scene, camera );
+}
+
+function processParticles() {
+    const mask = camera.layers.mask;
+    camera.layers.set(PARTICLE_CHANNEL);
+    renderer.setRenderTarget(particleTextureRT);
+    renderer.render(scene, camera);
+    camera.layers.mask = mask;
+
+    renderer.setRenderTarget(heightMapRT);
+    heightMapMaterial.uniforms.particleTexture.value = particleTextureRT.texture;
+    renderer.render(quadMesh, camera);
+
+    renderer.setRenderTarget(null);
 }
 
 export default {

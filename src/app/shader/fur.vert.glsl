@@ -1,5 +1,6 @@
 uniform vec4 shellParams;
 
+out vec3 vPosition;
 out vec2 vUv;
 out float vShellProgress;
 
@@ -20,6 +21,7 @@ void main() {
     vec4 viewPosition = viewMatrix * worldPosition;
     csm_PositionRaw = projectionMatrix * viewPosition;
 
+    vPosition = position;
     vUv = uv;
     vShellProgress = shellIndex / shellCount;
 }
