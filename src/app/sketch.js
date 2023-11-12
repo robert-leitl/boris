@@ -226,9 +226,10 @@ function setupParticleProcessing() {
     
     const particleTextureGeometry = new THREE.BufferGeometry();
     particleData = new THREE.BufferAttribute( new Float32Array(particles.length * 4), 4 );
-    particles.forEach((p, i) => particleData.setXYZ(i, p.position.x, p.position.y, p.position.z));
+    particles.forEach((p, i) => particleData.setXYZW(i, p.position.x, p.position.y, p.position.z, 0));
     particleData.usage = THREE.DynamicDrawUsage;
     particleTextureGeometry.setAttribute( 'position', particleData );
+    particleTextureGeometry.setDrawRange(0, particles.length);
     particleTextureMaterial = new THREE.RawShaderMaterial({
         glslVersion: THREE.GLSL3,
         vertexShader: particleTextureVertexShader,
@@ -249,6 +250,7 @@ function setupParticleProcessing() {
         vertexShader: heightMapVertexShader,
         fragmentShader: heightMapFragmentShader,
         uniforms: {
+            particleCount: { value: particles.length },
             particleTexture: { value: particleTextureRT.texture }
         }
     });
@@ -363,7 +365,7 @@ function animate() {
         m.multiply(new THREE.Matrix4().makeScale(p.animation.scale, p.animation.scale, p.animation.scale));
         eyesInstancedMesh.setMatrixAt(i, m);
 
-        particleData.setXYZ(i, p.position.x, p.position.y, p.position.z, p.animation.scale);
+        particleData.setXYZW(i, p.position.x, p.position.y, p.position.z, p.animation.scale);
     }
     particleData.needsUpdate = true;
     eyesInstancedMesh.instanceMatrix.needsUpdate = true;

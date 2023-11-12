@@ -9,8 +9,8 @@ void main() {
     int y = gl_VertexID / textureSize;
     int x = gl_VertexID % textureSize;
     vec2 pos = vec2(float(x), float(y));
-    pos += texelSize * 0.5;
     pos /= float(textureSize);
+    pos += texelSize * 0.5;
     pos = pos * 2. - 1.;
 
     vParticle = position;
