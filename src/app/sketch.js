@@ -44,7 +44,11 @@ var _isDev,
     arcControl,
     viewportSize;
 
+let orbGroup;
+
 let furTexture, furNormalTexture, furInstancedMesh;
+
+const RADIUS = 1;
 
 let eyesInstancedMesh;
 
@@ -105,6 +109,9 @@ function setupScene(canvas) {
     renderer.toneMapping = THREE.NoToneMapping;
     viewportSize = new Vector2(renderer.domElement.clientWidth, renderer.domElement.clientHeight);
 
+    orbGroup = new THREE.Group();
+    scene.add(orbGroup);
+
     const mainLight = new THREE.DirectionalLight(0xffffff, 2);
     mainLight.position.y = 3;
     scene.add(mainLight);
@@ -123,7 +130,7 @@ function setupScene(canvas) {
 }
 
 function setupEyes() {
-    const sphereRadius = 1;
+    const sphereRadius = RADIUS;
     const particleSize = 0.1;
     const samples = new PoissonSphereSurface(sphereRadius, 0.25).generateSamples();
 
@@ -173,7 +180,7 @@ function setupEyes() {
         eyesInstancedMesh.setMatrixAt(i, m);
     }
 
-    scene.add(eyesInstancedMesh);
+    orbGroup.add(eyesInstancedMesh);
 }
 
 function setupFur() {
@@ -199,7 +206,7 @@ function setupFur() {
         furMaterial,
         shellLayerCount
     );
-    //scene.add(furInstancedMesh);
+    orbGroup.add(furInstancedMesh);
 }
 
 function run(t = 0) {
@@ -225,7 +232,7 @@ function resize() {
 function animate() {
     arcControl.update(deltaTimeMS);
 
-    eyesInstancedMesh.quaternion.copy(arcControl.orientation);
+    orbGroup.quaternion.copy(arcControl.orientation);
 }
 
 function render() {
