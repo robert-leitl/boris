@@ -12,6 +12,7 @@ import { ArcballControl } from './util/arcball-control';
 import { PoissonBox } from './util/poisson-box';
 import { PoissonSphereSurface } from './util/poisson-sphere-surface';
 import { randomInRange } from './util/random-in-range';
+import { fromEvent } from 'rxjs';
 
 // the target duration of one frame in milliseconds
 const TARGET_FRAME_DURATION_MS = 16;
@@ -50,7 +51,11 @@ let furTexture, furNormalTexture, furInstancedMesh;
 
 const RADIUS = 1;
 
-let eyesInstancedMesh;
+let eyesInstancedMesh, particles, eyePointerTargetMesh;
+
+const normPointerPos = new Vector2();
+let surfacePoint = null;
+const surfaceVelocity = new Vector3();
 
 function init(canvas, onInit = null, isDev = false, pane = null) {
     _isDev = isDev;
@@ -130,15 +135,19 @@ function setupScene(canvas) {
 }
 
 function setupEyes() {
-    const sphereRadius = RADIUS;
+    const sphereRadius = RADIUS + 0.05;
     const particleSize = 0.1;
     const samples = new PoissonSphereSurface(sphereRadius, 0.25).generateSamples();
 
-    const particles = samples.map(s => {
+    particles = samples.map(s => {
         const particle = {
             position: s,
-            scale: randomInRange(.8, 1.6),
-            size: particleSize
+            scale: randomInRange(.9, 1.6),
+            size: particleSize,
+            animation: {
+                startTimeMS: undefined,
+                scale: 0
+            }
         };
         particle.size *= particle.scale;
         return particle;
@@ -176,11 +185,26 @@ function setupEyes() {
         const m = new THREE.Matrix4();
         const p = particles[i];
         m.makeTranslation(p.position);
-        m.multiply(new THREE.Matrix4().makeScale(p.scale, p.scale, p.scale));
+        m.multiply(new THREE.Matrix4().makeScale(p.animation.scale, p.animation.scale, p.animation.scale));
         eyesInstancedMesh.setMatrixAt(i, m);
     }
 
     orbGroup.add(eyesInstancedMesh);
+
+    eyePointerTargetMesh = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(RADIUS, 5),
+        new THREE.MeshBasicMaterial({ colorWrite: false })
+    );
+    eyePointerTargetMesh.visible = false;
+    eyePointerTargetMesh.layers.set(5);
+    raycaster.layers.set(5);
+    camera.layers.enable(5);
+    orbGroup.add(eyePointerTargetMesh);
+
+    fromEvent(window, 'pointermove').subscribe(e => {
+        normPointerPos.x = ( e.clientX / window.innerWidth ) * 2 - 1;
+	    normPointerPos.y = - ( e.clientY / window.innerHeight ) * 2 + 1;
+    });
 }
 
 function setupFur() {
@@ -231,8 +255,60 @@ function resize() {
 
 function animate() {
     arcControl.update(deltaTimeMS);
-
     orbGroup.quaternion.copy(arcControl.orientation);
+
+    // check pointer intersection
+    raycaster.setFromCamera( normPointerPos, camera );
+	const intersects = raycaster.intersectObjects( scene.children );
+    if (intersects.length > 0) {
+        const point = intersects[0].point;
+
+        if (!surfacePoint) {
+            surfacePoint = point.clone();
+        } else {
+            surfaceVelocity.subVectors(point, surfacePoint);
+            surfacePoint.copy(point);
+        }
+    } else {
+        surfacePoint = null;
+        surfaceVelocity.set(0, 0, 0);
+    }
+
+    // update eye animations
+    const surfaceVelocityMagnitude = surfaceVelocity.lengthSq();
+    particles.forEach(p => {
+        // update the animation for currently animated particles
+        if (p.animation.startTimeMS !== undefined) {
+            const elapsedTimeMS = timeMS - p.animation.startTimeMS;
+            const progress = elapsedTimeMS / 1000;
+
+            if (progress >= 1) {
+                // animation is complete
+                p.animation.startTimeMS = undefined;
+                p.animation.scale = 0;
+            } else {
+                p.animation.scale = p.scale * (1 - progress );
+            }
+
+        } else if (surfacePoint && surfaceVelocityMagnitude > 0.00001) {
+            // check for new animation starts only if the pointer intersects the surface
+            // and the surface velocity is above a threshold
+            const particleWorldPosition = p.position.clone().applyMatrix4(orbGroup.matrix);
+            if (particleWorldPosition.distanceTo(surfacePoint) < 0.2) {
+                p.animation.startTimeMS = timeMS;
+            }
+        }
+    });
+
+    // update eye instances
+    const m = new THREE.Matrix4();
+    for(let i=0; i<eyesInstancedMesh.count; ++i) {
+        const p = particles[i];
+        m.makeTranslation(p.position);
+        m.multiply(new THREE.Matrix4().makeScale(p.animation.scale, p.animation.scale, p.animation.scale));
+        eyesInstancedMesh.setMatrixAt(i, m);
+    }
+    eyesInstancedMesh.instanceMatrix.needsUpdate = true;
 }
 
 function render() {
