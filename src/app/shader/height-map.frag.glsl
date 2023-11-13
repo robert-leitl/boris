@@ -38,7 +38,7 @@ void main() {
     }
 
     // shape the height value
-    res = smoothstep(0., .9, res);
+    res = smoothstep(0.35, 1., res);
 
     outHeight = 1. - res;
 }

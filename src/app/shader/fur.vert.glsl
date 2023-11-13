@@ -17,7 +17,7 @@ void main() {
     // get the displacment from the normal maps alpha channel
     vec2 st = xyz2octahedron(normal);
     float displace = texture(normalMapTexture, st).a;
-    vec3 pos = position + normal * displace * 0.13;
+    vec3 pos = position + normal * displace * 0.08;
 
     // decompose shell parameters
     float shellCount = shellParams.x;

@@ -154,18 +154,20 @@ function setupScene(canvas) {
 }
 
 function setupEyes() {
-    const sphereRadius = RADIUS + 0.05;
+    const sphereRadius = RADIUS;
     const particleSize = PARTICLE_SIZE;
     const samples = new PoissonSphereSurface(sphereRadius, particleSize * 2.5).generateSamples();
 
     particles = samples.map(s => {
         const particle = {
             position: s,
+            normal: s.clone().normalize(),
             scale: randomInRange(.9, 1.6),
             size: particleSize,
             animation: {
                 startTimeMS: undefined,
-                scale: 0
+                scale: 0,
+                position: new Vector3()
             }
         };
         particle.size *= particle.scale;
@@ -372,6 +374,9 @@ function animate() {
                 p.animation.scale = 0;
             } else {
                 p.animation.scale = p.scale * (1 - progress );
+                const positionOffset = p.size * p.animation.scale * .2;
+                p.animation.position.copy(p.position);
+                p.animation.position.add(p.normal.clone().multiplyScalar(positionOffset));
             }
 
         } else if (surfacePoint && surfaceVelocityMagnitude > 0.00001) {
@@ -388,7 +393,7 @@ function animate() {
     const m = new THREE.Matrix4();
     for(let i=0; i<eyesInstancedMesh.count; ++i) {
         const p = particles[i];
-        m.makeTranslation(p.position);
+        m.makeTranslation(p.animation.position);
         m.multiply(new THREE.Matrix4().makeScale(p.animation.scale, p.animation.scale, p.animation.scale));
         eyesInstancedMesh.setMatrixAt(i, m);
 
