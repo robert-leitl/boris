@@ -39,7 +39,7 @@ var frames = 0;
 var deltaFrames = 0;
 
 const settings = {
-    shellParams: new THREE.Vector4(20, 0.07) // (shell count, shell thickness, tbd, tbd)
+    shellParams: new THREE.Vector4(32, 0.07) // (shell count, shell thickness, tbd, tbd)
 }
 
 // module variables
@@ -340,7 +340,8 @@ function resize() {
         renderer.getSize(viewportSize);
         camera.aspect = viewportSize.x / viewportSize.y;
 
-        fitSphereAtOriginToViewport(1.3, camera, 0, 0.2, 0.2);
+        const padding = camera.aspect > 1 ? 0.5 : 0.2;
+        fitSphereAtOriginToViewport(1., camera, padding, 0.2, 0.2);
 
         camera.updateProjectionMatrix();
     }
