@@ -66,7 +66,7 @@ export class ArcballControl {
 
         if (this.isPointerDown) {
             // the intensity of the pointer to reach the new position (lower value --> slower movement)
-            const INTENSITY = 0.01 * timeScale;
+            const INTENSITY = 0.005 * timeScale;
             // the factor to amplify the rotation angle (higher value --> faster rotation)
             const ANGLE_AMPLIFICATION = 10 / timeScale;
 

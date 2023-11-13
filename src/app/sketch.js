@@ -36,7 +36,7 @@ var frames = 0;
 var deltaFrames = 0;
 
 const settings = {
-    shellParams: new THREE.Vector4(1, 0.08) // (shell count, shell thickness, tbd, tbd)
+    shellParams: new THREE.Vector4(20, 0.07) // (shell count, shell thickness, tbd, tbd)
 }
 
 // module variables
@@ -90,16 +90,9 @@ function init(canvas, onInit = null, isDev = false, pane = null) {
         glbScene = (gltf.scene)
     });*/
 
-    const furVariant = '02';
-    furTexture = new THREE.TextureLoader(manager).load(new URL(`../assets/fur${furVariant}.png`, import.meta.url));
-    furNormalTexture = new THREE.TextureLoader(manager).load(new URL(`../assets/fur${furVariant}-normal.png`, import.meta.url));
+    furTexture = new THREE.TextureLoader(manager).load(new URL(`../assets/fur02.jpg`, import.meta.url));
 
     manager.onLoad = () => {
-        furNormalTexture.colorSpace = THREE.NoColorSpace;
-        furNormalTexture.wrapS = THREE.RepeatWrapping;
-        furNormalTexture.wrapT = THREE.RepeatWrapping;
-        furNormalTexture.magFilter = THREE.NearestFilter;
-        furNormalTexture.minFilter = THREE.NearestFilter;
         furTexture.wrapS = THREE.RepeatWrapping;
         furTexture.wrapT = THREE.RepeatWrapping;
         furTexture.magFilter = THREE.LinearFilter;
@@ -346,7 +339,11 @@ function resize() {
 
 function animate() {
     arcControl.update(deltaTimeMS);
-    orbGroup.quaternion.copy(arcControl.orientation);
+    const rot = arcControl.orientation.clone();
+    rot.multiply(new THREE.Quaternion(0, Math.cos(timeMS * 0.00003), 0, Math.sin(timeMS * 0.00003)));
+    orbGroup.quaternion.copy(rot);
+    orbGroup.position.y = Math.sin(timeMS * 0.001) * 0.03;
+    orbGroup.position.z = Math.sin(timeMS * 0.002) * 0.05;
 
     // check pointer intersection
     raycaster.setFromCamera( normPointerPos, camera );
@@ -376,7 +373,7 @@ function animate() {
             const particleWorldPosition = p.position.clone().applyMatrix4(orbGroup.matrix);
             if (particleWorldPosition.distanceTo(surfacePoint) < 0.2) {
                 anim.target = 1;
-                anim.startTimeMS = timeMS;
+                anim.startTimeMS = timeMS + randomInRange(-200, 200);
             }
         }
 
@@ -384,15 +381,16 @@ function animate() {
         const elapsedTimeMS = timeMS - anim.startTimeMS;
         const closeDelay = 2000;
         const progress = elapsedTimeMS / closeDelay;
-        anim.target = progress < 0.99 ? anim.target : -0.2;
+        anim.target = progress < 0.99 ? anim.target : -0.1;
 
         // pseudo physics
-        anim.force += (anim.target - anim.value) * 0.1;
-        anim.value += (anim.force - anim.value) * 0.1;
+        const fs = deltaTimeMS / 150;
+        anim.force += (anim.target - anim.value) * fs;
+        anim.value += (anim.force - anim.value) * fs;
 
         // update animation props
         anim.scale = p.scale * Math.max(0, anim.value);
-        const positionOffset = p.size * p.animation.scale * .2;
+        const positionOffset = p.size * p.animation.scale * .25;
         p.animation.position.copy(p.position);
         p.animation.position.add(p.normal.clone().multiplyScalar(positionOffset));
 

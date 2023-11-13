@@ -11,7 +11,9 @@ in float vDisplace;
 
 layout(location=0) out vec4 outColor;
 
+#include "./util/constants/pi.glsl";
 #include "./util/xyz2octahedron.glsl";
+#include "./util/xyz2equirect.glsl";
 
 void main(void) {
     vec4 color = vec4(1.);
@@ -29,20 +31,14 @@ void main(void) {
     N = vNormalMatrix * N;
 
 
-    /*vec2 uv = fract(vUv * vec2(2., 1.));
-
-    vec2 o = xyz2octahedron(normalize(vPosition));
-    vec4 h = texture(normalMapTexture, o);
-
+    vec2 uv = vUv * vec2(2., 1.);
     vec4 fur = texture(furTexture, uv);
     float alpha = smoothstep(max(0., vShellProgress - 0.5), vShellProgress, fur.r);
 
-    color = fur * vec4(1., 0.6, 0.5, 0.);
-    color.rgb = h.rgb;
-    color.a = alpha;*/
+    float diffuse = dot(L1, N);
 
-    color.rgb = vec3(dot(L1, N));
-    //color.rgb = pN1t;
+    color = fur * diffuse;
+    color.a = alpha;
 
     outColor = color;
 }
