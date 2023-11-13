@@ -59,7 +59,7 @@ const PARTICLE_SIZE = 0.12;
 
 let eyesInstancedMesh, particles, eyePointerTargetMesh;
 
-const normPointerPos = new Vector2();
+const normPointerPos = new Vector2(-1, -1);
 let surfacePoint = null;
 const surfaceVelocity = new Vector3();
 
@@ -162,10 +162,13 @@ function setupEyes() {
         const particle = {
             position: s,
             normal: s.clone().normalize(),
-            scale: randomInRange(.9, 1.6),
+            scale: randomInRange(.9, 1.4),
             size: particleSize,
             animation: {
                 startTimeMS: undefined,
+                target: 0,
+                force: 0,
+                value: 0,
                 scale: 0,
                 position: new Vector3()
             }
@@ -363,30 +366,34 @@ function animate() {
     // update eye animations
     const surfaceVelocityMagnitude = surfaceVelocity.lengthSq();
     particles.forEach(p => {
-        // update the animation for currently animated particles
-        if (p.animation.startTimeMS !== undefined) {
-            const elapsedTimeMS = timeMS - p.animation.startTimeMS;
-            const progress = elapsedTimeMS / 1000;
+        const anim = p.animation;
 
-            if (progress >= 1) {
-                // animation is complete
-                p.animation.startTimeMS = undefined;
-                p.animation.scale = 0;
-            } else {
-                p.animation.scale = p.scale * (1 - progress );
-                const positionOffset = p.size * p.animation.scale * .2;
-                p.animation.position.copy(p.position);
-                p.animation.position.add(p.normal.clone().multiplyScalar(positionOffset));
-            }
-
-        } else if (surfacePoint && surfaceVelocityMagnitude > 0.00001) {
+        if (surfacePoint) {
             // check for new animation starts only if the pointer intersects the surface
             // and the surface velocity is above a threshold
             const particleWorldPosition = p.position.clone().applyMatrix4(orbGroup.matrix);
             if (particleWorldPosition.distanceTo(surfacePoint) < 0.2) {
-                p.animation.startTimeMS = timeMS;
+                anim.target = 1;
+                anim.startTimeMS = timeMS;
             }
         }
+
+        // wait some time until the eye closes
+        const elapsedTimeMS = timeMS - anim.startTimeMS;
+        const closeDelay = 1000;
+        const progress = elapsedTimeMS / closeDelay;
+        anim.target = progress < 0.9 ? anim.target : -0.2;
+
+        // pseudo physics
+        anim.force += (anim.target - anim.value) * 0.1;
+        anim.value += (anim.force - anim.value) * 0.1;
+
+        // update animation props
+        anim.scale = p.scale * Math.max(0, anim.value);
+        const positionOffset = p.size * p.animation.scale * .2;
+        p.animation.position.copy(p.position);
+        p.animation.position.add(p.normal.clone().multiplyScalar(positionOffset));
+
     });
 
     // update eye instances

@@ -19,7 +19,7 @@ void main() {
     ivec2 particleTexSize = textureSize(particleTexture, 0);
 
     vec3 pos = octahedron2xyz(vUv);
-    float w = .9; // smoothing factor (the higher, the smoother)
+    float w = .8; // smoothing factor (the higher, the smoother)
     float res = 1.; // result height value
 
     // smooth voronoi (https://www.shadertoy.com/view/ldB3zc)
@@ -34,11 +34,11 @@ void main() {
         // the bigger the size, the more weight for this distance
         h *= p.w;
 
-        res = mix(res, d, h) - h * (1.0 - h) * (w / (1.0 + 3.0 * w));
+        res = mix(res, d, h) - h * (1. * particleSize * 23. - h) * (w / (1.0 + 3.0 * w));
     }
 
     // shape the height value
-    res = smoothstep(0.35, 1., res);
+    res = smoothstep(0., 1., res);
 
     outHeight = 1. - res;
 }
