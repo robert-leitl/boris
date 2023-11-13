@@ -261,6 +261,8 @@ function setupParticleProcessing() {
         new QuadGeometry(),
         heightMapMaterial
     );
+
+    eyesInstancedMesh.visible = false;
 }
 
 function setupFur() {
