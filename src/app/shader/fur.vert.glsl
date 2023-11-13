@@ -1,11 +1,23 @@
 uniform vec4 shellParams;
+uniform sampler2D normalMapTexture;
 
 out vec3 vPosition;
+out vec3 vNormal;
+out vec3 vTangent;
 out vec2 vUv;
 out float vShellProgress;
+out mat3 vNormalMatrix;
+
+#include "./util/xyz2octahedron.glsl";
+#include "./util/orthogonal.glsl";
 
 void main() {
     float shellIndex = float(gl_InstanceID);
+
+    // get the displacment from the normal maps alpha channel
+    vec2 st = xyz2octahedron(normal);
+    float displace = texture(normalMapTexture, st).a;
+    vec3 pos = position + normal * displace * 0.13;
 
     // decompose shell parameters
     float shellCount = shellParams.x;
@@ -14,14 +26,17 @@ void main() {
     // offset the shell instance
     float shellLayerThickness = shellThickness / shellCount;
     vec3 shellOffset = normal * shellIndex * shellLayerThickness;
-    vec3 pos = position + shellOffset;
+    pos += shellOffset;
 
     vec4 instancePosition = instanceMatrix * vec4(pos, 1.0);
     vec4 worldPosition = modelMatrix * instancePosition;
     vec4 viewPosition = viewMatrix * worldPosition;
-    csm_PositionRaw = projectionMatrix * viewPosition;
+    gl_Position = projectionMatrix * viewPosition;
 
     vPosition = position;
+    vNormal = normal;
+    vTangent = normalize(cross(vec3(0., 1., 0.), normal));
     vUv = uv;
     vShellProgress = shellIndex / shellCount;
+    vNormalMatrix = normalMatrix;
 }

@@ -1,5 +1,6 @@
 uniform sampler2D particleTexture;
 uniform int particleCount;
+uniform float particleSize;
 
 in vec2 vUv;
 
@@ -24,7 +25,7 @@ void main() {
     // smooth voronoi (https://www.shadertoy.com/view/ldB3zc)
     for(int i=0; i<particleCount; i++) {
         vec4 p = texelFetch(particleTexture, ndx2tex(particleTexSize, i), 0);
-        float d = sphericalDistance(normalize(p.xyz), pos) / 0.3;
+        float d = sphericalDistance(normalize(p.xyz), pos) / (particleSize * 2.5);
 
         // do the smooth min 
         float h = smoothstep( -1., 1., (res - d) / w );
@@ -37,7 +38,7 @@ void main() {
     }
 
     // shape the height value
-    res = smoothstep(0., .8, res);
+    res = smoothstep(0., .9, res);
 
     outHeight = 1. - res;
 }
