@@ -2,6 +2,7 @@ uniform vec4 shellParams;
 uniform sampler2D normalMapTexture;
 
 out vec3 vPosition;
+out vec3 vWorldPosition;
 out vec3 vNormal;
 out vec3 vTangent;
 out vec2 vUv;
@@ -55,6 +56,7 @@ void main() {
     gl_Position = projectionMatrix * viewPosition;
 
     vPosition = position;
+    vWorldPosition = worldPosition.xyz;
     vNormal = normal;
     vTangent = normalize(cross(vec3(0., 1., 0.), normal));
     vUv = uv;

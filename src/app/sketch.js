@@ -13,11 +13,14 @@ import { fromEvent } from 'rxjs';
 
 import furVertexShader from './shader/fur.vert.glsl';
 import furFragmentShader from './shader/fur.frag.glsl';
+import eyeVertexShader from './shader/eye.vert.glsl';
+import eyeFragmentShader from './shader/eye.frag.glsl';
 import particleTextureVertexShader from './shader/particle-texture.vert.glsl';
 import particleTextureFragmentShader from './shader/particle-texture.frag.glsl';
 import heightMapFragmentShader from './shader/height-map.frag.glsl';
 import normalMapFragmentShader from './shader/normal-map.frag.glsl';
 import { QuadGeometry } from './util/quad-geometry';
+import { fitSphereAtOriginToViewport } from './util/fit-to-viewport';
 
 // the target duration of one frame in milliseconds
 const TARGET_FRAME_DURATION_MS = 16;
@@ -57,7 +60,7 @@ let furTexture, furNormalTexture, furInstancedMesh;
 const RADIUS = 1;
 const PARTICLE_SIZE = 0.12;
 
-let eyesInstancedMesh, particles, eyePointerTargetMesh;
+let eyesInstancedMesh, particles, eyePointerTargetMesh, envTexture;
 
 const normPointerPos = new Vector2(-1, -1);
 let surfacePoint = null;
@@ -75,20 +78,15 @@ function init(canvas, onInit = null, isDev = false, pane = null) {
     _pane = pane;
 
     if (pane) {
-        pane.addBinding(settings.shellParams, 'y', {
+        /*pane.addBinding(settings.shellParams, 'y', {
             label: 'Thickness',
             min: 0.01,
             max: 0.2,
             value: settings.shellParams.y
-        });
+        });*/
     }
 
     const manager = new LoadingManager();
-
-    /*const objLoader = new GLTFLoader(manager);
-    objLoader.load((new URL('../assets/scene.glb', import.meta.url)).toString(), (gltf) => {
-        glbScene = (gltf.scene)
-    });*/
 
     furTexture = new THREE.TextureLoader(manager).load(new URL(`../assets/fur02.jpg`, import.meta.url));
 
@@ -110,12 +108,13 @@ function init(canvas, onInit = null, isDev = false, pane = null) {
 }
 
 function setupScene(canvas) {
-    camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 3, 7 );
-    camera.position.set(0, 0, 5);
+    camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 2, 7 );
+    camera.position.set(0, 0, 4);
     camera.lookAt(new Vector3());
     
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xfffffa);
+    const bg = new THREE.Color().setHSL(0.8, .6, 0.002);
+    scene.background = bg;
     renderer = new THREE.WebGLRenderer( { canvas, antialias: true } );
     renderer.toneMapping = THREE.NoToneMapping;
     viewportSize = new Vector2(renderer.domElement.clientWidth, renderer.domElement.clientHeight);
@@ -191,10 +190,17 @@ function setupEyes() {
         })
     }
 
-
+    const eyeMaterial = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        vertexShader: eyeVertexShader,
+        fragmentShader: eyeFragmentShader,
+        uniforms: {
+            envTexture: {value: envTexture},
+        }
+    });
     eyesInstancedMesh = new THREE.InstancedMesh(
-        new THREE.IcosahedronGeometry(particleSize, 10),
-        new THREE.MeshLambertMaterial({ color: 0x444444 }),
+        new THREE.IcosahedronGeometry(particleSize, 12),
+        eyeMaterial,
         particles.length
     );
 
@@ -333,6 +339,9 @@ function resize() {
     if (resizeRendererToDisplaySize(renderer)) {
         renderer.getSize(viewportSize);
         camera.aspect = viewportSize.x / viewportSize.y;
+
+        fitSphereAtOriginToViewport(1.2, camera, 0, 0.2, 0.2);
+
         camera.updateProjectionMatrix();
     }
 }
