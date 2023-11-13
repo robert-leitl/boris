@@ -340,7 +340,7 @@ function resize() {
         renderer.getSize(viewportSize);
         camera.aspect = viewportSize.x / viewportSize.y;
 
-        fitSphereAtOriginToViewport(1.2, camera, 0, 0.2, 0.2);
+        fitSphereAtOriginToViewport(1.3, camera, 0, 0.2, 0.2);
 
         camera.updateProjectionMatrix();
     }
