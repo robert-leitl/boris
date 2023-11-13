@@ -17,6 +17,7 @@ ivec2 ndx2tex(ivec2 dimensions, int index) {
 
 void main() {
     ivec2 particleTexSize = textureSize(particleTexture, 0);
+    vec2 texelSize = 1. / vec2(particleTexSize);
 
     vec3 pos = octahedron2xyz(vUv);
     float w = .8; // smoothing factor (the higher, the smoother)

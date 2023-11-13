@@ -7,6 +7,7 @@ in vec3 vTangent;
 in vec2 vUv;
 in float vShellProgress;
 in mat3 vNormalMatrix;
+in float vDisplace;
 
 layout(location=0) out vec4 outColor;
 
@@ -15,6 +16,7 @@ layout(location=0) out vec4 outColor;
 void main(void) {
     vec4 color = vec4(1.);
 
+    vec3 P = normalize(vPosition);
     vec3 L1 = vec3(0., 1., 0.1);
     vec3 N = normalize(vNormal);
     vec3 T = normalize(vTangent);

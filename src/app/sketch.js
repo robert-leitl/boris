@@ -278,7 +278,8 @@ function setupParticleProcessing() {
         magFilter: THREE.LinearFilter, 
         minFilter: THREE.LinearFilter,
         wrapS: THREE.ClampToEdgeWrapping,
-        wrapT: THREE.ClampToEdgeWrapping
+        wrapT: THREE.ClampToEdgeWrapping,
+        generateMipmaps: false
     });
 
     normalMapMaterial = new THREE.ShaderMaterial({
@@ -295,7 +296,8 @@ function setupParticleProcessing() {
         magFilter: THREE.LinearFilter, 
         minFilter: THREE.LinearFilter,
         wrapS: THREE.ClampToEdgeWrapping,
-        wrapT: THREE.ClampToEdgeWrapping
+        wrapT: THREE.ClampToEdgeWrapping,
+        generateMipmaps: false
     });
 }
 
@@ -313,7 +315,7 @@ function setupFur() {
         },
         transparent: true,
     });
-    const furInstanceGeometry = new THREE.IcosahedronGeometry(1, 24);
+    const furInstanceGeometry = new THREE.IcosahedronGeometry(1, 12);
     furInstancedMesh = new THREE.InstancedMesh(
         furInstanceGeometry,
         furMaterial,
@@ -380,9 +382,9 @@ function animate() {
 
         // wait some time until the eye closes
         const elapsedTimeMS = timeMS - anim.startTimeMS;
-        const closeDelay = 1000;
+        const closeDelay = 2000;
         const progress = elapsedTimeMS / closeDelay;
-        anim.target = progress < 0.9 ? anim.target : -0.2;
+        anim.target = progress < 0.99 ? anim.target : -0.2;
 
         // pseudo physics
         anim.force += (anim.target - anim.value) * 0.1;

@@ -7,6 +7,7 @@ out vec3 vTangent;
 out vec2 vUv;
 out float vShellProgress;
 out mat3 vNormalMatrix;
+out float vDisplace;
 
 #include "./util/xyz2octahedron.glsl";
 #include "./util/orthogonal.glsl";
@@ -15,7 +16,8 @@ void main() {
     float shellIndex = float(gl_InstanceID);
 
     // get the displacment from the normal maps alpha channel
-    vec2 st = xyz2octahedron(normal);
+    vec3 sn = normal;
+    vec2 st = xyz2octahedron(sn, 0.001);
     float displace = texture(normalMapTexture, st).a;
     vec3 pos = position + normal * displace * 0.08;
 
@@ -39,4 +41,5 @@ void main() {
     vUv = uv;
     vShellProgress = shellIndex / shellCount;
     vNormalMatrix = normalMatrix;
+    vDisplace = displace;
 }
