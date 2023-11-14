@@ -58,7 +58,7 @@ let orbGroup;
 let furTexture, furNormalTexture, furInstancedMesh;
 
 const RADIUS = 1;
-const PARTICLE_SIZE = 0.12;
+const PARTICLE_RADIUS = 0.12;
 
 let eyesInstancedMesh, particles, eyePointerTargetMesh, envTexture;
 
@@ -147,25 +147,29 @@ function setupScene(canvas) {
 
 function setupEyes() {
     const sphereRadius = RADIUS;
-    const particleSize = PARTICLE_SIZE;
-    const samples = new PoissonSphereSurface(sphereRadius, particleSize * 2.5).generateSamples();
+    const particleRadius = PARTICLE_RADIUS;
+    const samples = new PoissonSphereSurface(sphereRadius, particleRadius * 2.5).generateSamples();
 
     particles = samples.map(s => {
         const particle = {
             position: s,
-            normal: s.clone().normalize(),
-            scale: randomInRange(.9, 1.4),
-            size: particleSize,
+            normal: null,
+            initialScale: randomInRange(.8, 1.4),
+            radius: particleRadius,
+            initialPosition: null,
             animation: {
                 startTimeMS: undefined,
-                target: 0,
-                force: 0,
-                value: 0,
-                scale: 0,
-                position: new Vector3()
+                scaleTarget: 0,
+                scaleForce: 0,
+                scaleValue: 0,
+                currentScale: 0,
+                positionTarget: null,
+                positionForce: null,
+                positionValue: null,
+                currentPosition: null,
             }
         };
-        particle.size *= particle.scale;
+        particle.radius *= particle.initialScale;
         return particle;
     });
 
@@ -178,7 +182,7 @@ function setupEyes() {
     
                 const d = new Vector3().subVectors(p.position, n.position);
                 const l = d.lengthSq();
-                const s = p.size + n.size;
+                const s = p.radius + n.radius;
     
                 if (l < s ** 2) {
                     offset.add(d.divideScalar(l));
@@ -190,6 +194,16 @@ function setupEyes() {
         })
     }
 
+    // update the particle positions
+    particles.forEach(p => {
+        p.normal = p.position.clone().normalize();
+        p.initialPosition = p.normal.clone().multiplyScalar(sphereRadius + p.radius * 0.4);
+        p.animation.positionTarget = p.position.clone();
+        p.animation.positionForce = p.position.clone();
+        p.animation.positionValue = p.position.clone();
+        p.animation.currentPosition = p.position.clone();
+    });
+
     const eyeMaterial = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3,
         vertexShader: eyeVertexShader,
@@ -199,7 +213,7 @@ function setupEyes() {
         }
     });
     eyesInstancedMesh = new THREE.InstancedMesh(
-        new THREE.IcosahedronGeometry(particleSize, 12),
+        new THREE.IcosahedronGeometry(particleRadius, 12),
         eyeMaterial,
         particles.length
     );
@@ -265,7 +279,7 @@ function setupParticleProcessing() {
         vertexShader: QuadGeometry.vertexShader,
         fragmentShader: heightMapFragmentShader,
         uniforms: {
-            particleSize: { value: PARTICLE_SIZE },
+            particleSize: { value: PARTICLE_RADIUS },
             particleCount: { value: particles.length },
             particleTexture: { value: particleTextureRT.texture }
         }
@@ -374,16 +388,22 @@ function animate() {
 
     // update eye animations
     const surfaceVelocityMagnitude = surfaceVelocity.lengthSq();
+    const v = new Vector3();
     particles.forEach(p => {
         const anim = p.animation;
 
-        if (surfacePoint) {
+        if (surfacePoint && surfaceVelocityMagnitude > 0.001) {
             // check for new animation starts only if the pointer intersects the surface
             // and the surface velocity is above a threshold
             const particleWorldPosition = p.position.clone().applyMatrix4(orbGroup.matrix);
             if (particleWorldPosition.distanceTo(surfacePoint) < 0.2) {
-                anim.target = 1;
+                anim.scaleTarget = 1;
+                anim.positionTarget.copy(p.initialPosition);
                 anim.startTimeMS = timeMS + randomInRange(-200, 200);
+
+                // get the pointer velocity in model space
+                const modelSurfaceVelocity = orbGroup.worldToLocal(surfaceVelocity.clone());
+                anim.positionForce.add(modelSurfaceVelocity.multiplyScalar(0.2));
             }
         }
 
@@ -391,18 +411,20 @@ function animate() {
         const elapsedTimeMS = timeMS - anim.startTimeMS;
         const closeDelay = 2000;
         const progress = elapsedTimeMS / closeDelay;
-        anim.target = progress < 0.99 ? anim.target : -0.1;
+        anim.scaleTarget = progress < 0.95 ? anim.scaleTarget : -0.1;
+        anim.positionTarget.copy(progress < 0.99 ? anim.positionTarget : p.position);
 
         // pseudo physics
         const fs = deltaTimeMS / 150;
-        anim.force += (anim.target - anim.value) * fs;
-        anim.value += (anim.force - anim.value) * fs;
+        anim.scaleForce += (anim.scaleTarget - anim.scaleValue) * fs;
+        anim.scaleValue += (anim.scaleForce - anim.scaleValue) * fs;
+        const fp = deltaTimeMS / 150;
+        anim.positionForce.add(v.subVectors(anim.positionTarget, anim.positionValue).multiplyScalar(fp));
+        anim.positionValue.add(v.subVectors(anim.positionForce, anim.positionValue).multiplyScalar(fp));
 
         // update animation props
-        anim.scale = p.scale * Math.max(0, anim.value);
-        const positionOffset = p.size * p.animation.scale * .25;
-        p.animation.position.copy(p.position);
-        p.animation.position.add(p.normal.clone().multiplyScalar(positionOffset));
+        anim.currentScale = p.initialScale * Math.max(0, anim.scaleValue);
+        anim.currentPosition.copy(anim.positionValue).normalize().multiplyScalar(RADIUS);
 
     });
 
@@ -410,11 +432,11 @@ function animate() {
     const m = new THREE.Matrix4();
     for(let i=0; i<eyesInstancedMesh.count; ++i) {
         const p = particles[i];
-        m.makeTranslation(p.animation.position);
-        m.multiply(new THREE.Matrix4().makeScale(p.animation.scale, p.animation.scale, p.animation.scale));
+        m.makeTranslation(p.animation.positionValue);
+        m.multiply(new THREE.Matrix4().makeScale(p.animation.currentScale, p.animation.currentScale, p.animation.currentScale));
         eyesInstancedMesh.setMatrixAt(i, m);
 
-        particleData.setXYZW(i, p.position.x, p.position.y, p.position.z, p.animation.scale);
+        particleData.setXYZW(i, p.animation.currentPosition.x, p.animation.currentPosition.y, p.animation.currentPosition.z, p.animation.currentScale);
     }
     particleData.needsUpdate = true;
     eyesInstancedMesh.instanceMatrix.needsUpdate = true;

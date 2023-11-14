@@ -16,7 +16,7 @@ void main() {
 
     vec3 T = orthogonal(N);
     vec3 B = cross(N, T);
-    float s = 4.; // artificial strength
+    float s = 6.; // artificial strength
 
     vec2 o1 = xyz2octahedron(normalize(N + T * epsilon));
     float h1 = texture(heightMapTexture, o1).r;
