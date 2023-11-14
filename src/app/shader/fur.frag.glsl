@@ -20,10 +20,6 @@ float powFast(float a, float b) {
   return a / ((1. - b) * a + b);
 }
 
-vec3 brightnessContrast( vec3 color, float brightness, float contrast ) {
-    return ( color - 0.5 ) * contrast + 0.5 + brightness;
-}
-
 void main(void) {
     vec4 color = vec4(1.);
 
@@ -64,8 +60,7 @@ void main(void) {
     // add frsnel on top
     color.rgb += fresnelColor * 1.1;
 
-    // boost brightness and contrast
-    color.rgb = brightnessContrast(color.rgb, 0.02, 1.15);
+    color.rgb = clamp(color.rgb, vec3(0.), vec3(1.));
 
     color.a = alpha;
     outColor = color;
